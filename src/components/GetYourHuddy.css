@@ -1,0 +1,72 @@
+/* src/pages/GetYourHuddy.css */
+.get-huddy-root {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.scanner-area {
+  margin-top: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.result-area {
+  margin-top: 14px;
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-card {
+  border-radius: 10px;
+  padding: 14px 18px;
+  min-width: 320px;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(12, 20, 40, 0.06);
+}
+
+.result-area.loading .result-card {
+  background: #fff9e6;
+  border: 1px solid #ffe08a;
+}
+
+.result-area.success .result-card {
+  background: #ecfdf5;
+  border: 1px solid #34d399;
+}
+
+.result-area.taken .result-card {
+  background: #fff1f2;
+  border: 1px solid #fda4af;
+}
+
+.result-area.notfound .result-card {
+  background: #fff7ed;
+  border: 1px solid #fbbf24;
+}
+
+.result-area.error .result-card {
+  background: #fff1f2;
+  border: 1px solid #f87171;
+}
+
+.result-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 6px;
+}
+
+.result-text {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.result-sub {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #334155;
+}

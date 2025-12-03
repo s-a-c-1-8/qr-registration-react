@@ -1,0 +1,282 @@
+/* ---------- Base container ---------- */
+.qr-root {
+  width: 100%;
+  max-width: 820px;
+  margin: 18px auto;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  position: relative;
+  color: #0f172a;
+}
+
+/* ---------- Camera container (centers 400x400 frame) ---------- */
+.camera-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+.camera-container.hidden {
+  display: none;
+}
+
+.camera-frame {
+  width: 400px;
+  height: 400px;
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #000 0%, #0b1220 100%);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Video will cover the square frame */
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+
+/* ---------- Loading skeleton / spinner ---------- */
+.camera-skeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.4));
+  color: #fff;
+  z-index: 30;
+}
+
+.skeleton-box {
+  width: 260px;
+  height: 180px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  animation: pulse 1.2s infinite ease-in-out;
+}
+
+.skeleton-text {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; transform: translateY(0px); }
+  50% { opacity: 0.55; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+
+/* Circular spinner */
+.spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 4px solid rgba(255,255,255,0.12);
+  border-top-color: rgba(255,255,255,0.95);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Overlay guide (corners + hint) ---------- */
+.camera-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.corner {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(255,255,255,0.95);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+.corner.top-left { top: 22px; left: 22px; border-right: none; border-bottom: none; }
+.corner.top-right { top: 22px; right: 22px; border-left: none; border-bottom: none; }
+.corner.bottom-left { bottom: 22px; left: 22px; border-right: none; border-top: none; }
+.corner.bottom-right { bottom: 22px; right: 22px; border-left: none; border-top: none; }
+
+.scan-text {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.55);
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: white;
+  font-size: 13px;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.28);
+}
+
+/* ---------- Message overlay (shown after scan) ---------- */
+.message-wrap {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  z-index: 50;
+}
+.message-card {
+  width: 100%;
+  max-width: 580px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  box-shadow: 0 14px 36px rgba(2,6,23,0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.message-wrap.success .message-card {
+  border: 1px solid rgba(16,185,129,0.12);
+}
+.message-wrap.error .message-card {
+  border: 1px solid rgba(239,68,68,0.08);
+}
+
+.emoji {
+  font-size: 46px;
+  line-height: 1;
+}
+
+.message-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.message-wrap.success .message-text { color: #047857; }
+.message-wrap.error .message-text { color: #b91c1c; }
+
+.sub {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* ---------- Camera error card ---------- */
+.error-wrap {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+.error-card {
+  width: 100%;
+  max-width: 580px;
+  background: #fff7f7;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(239,68,68,0.08);
+  box-shadow: 0 12px 30px rgba(2,6,23,0.06);
+  text-align: center;
+}
+.error-card .emoji { font-size: 34px; margin-bottom: 8px; }
+.error-text { color: #7f1d1d; font-weight: 600; margin-bottom: 12px; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+}
+.btn-primary {
+  background: linear-gradient(90deg,#111827,#0b1220);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(2,6,23,0.16);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 480px) {
+  .camera-frame { width: 300px; height: 300px; border-radius: 10px; }
+  .corner { width: 30px; height: 30px; }
+  .scan-text { font-size: 12px; padding: 6px 10px; }
+  .message-card { padding: 18px; }
+  .skeleton-box { width: 220px; height: 140px; }
+}
+
+
+/* ---------- Container ---------- */
+.qr-root {
+  width: 100%;
+  max-width: 820px;
+  margin: 18px auto;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  position: relative;
+  color: #0f172a;
+}
+
+/* ---------- Camera container (centered 400x400) ---------- */
+.camera-container { width: 100%; display: flex; justify-content: center; margin-top: 12px; }
+.camera-container.hidden { display: none; }
+
+.camera-frame {
+  width: 400px;
+  height: 400px;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg,#020617 0%, #071125 100%);
+  border: 1px solid rgba(99,102,241,0.06);
+  box-shadow: 0 12px 40px rgba(3,7,18,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+  transform-origin: center;
+  transition: transform 260ms ease, box-shadow 260ms ease, opacity 260ms ease;
+}
+
+/* subtle scale when active scanning */
+.camera-frame.active { box-shadow: 0 20px 48px rgba(3,7,18,0.72); transform: translateY(-2px) scale(1.002); }
+
+/* slight blur/overlay while initializing */
+.camera-frame.blurred::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(2,6,23,0.45), rgba(2,6,23,0.35));
+  z-index: 30;
+  backdrop-filter: blur(3px);
+}
+
+/* video covers frame */
+.camera-video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+
+/* ---------- Loading skeleton ---------- */
+.camera-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display:flex;
+  flex-direction: column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color: #fff;
+}
+.skeleton-box {
+  width: 260px; height: 180px; border-radius: 10px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+  box-shadow: inset 0 0 0
+}

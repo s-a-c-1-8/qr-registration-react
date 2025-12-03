@@ -1,0 +1,144 @@
+/* Add these styles to your existing CSS file */
+
+.qr-result {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.user-info {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 25px;
+  border-left: 4px solid #4f46e5;
+}
+
+.unique-id {
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  word-break: break-all;
+  display: inline-block;
+  margin: 5px 0;
+}
+
+.qr-encoded-text {
+  margin-top: 15px;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px dashed #cbd5e1;
+}
+
+.qr-preview {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin: 25px 0;
+  text-align: center;
+}
+
+.qr-image-container {
+  position: relative;
+  display: inline-block;
+  margin: 15px 0;
+}
+
+.qr-image-container img {
+  width: 320px;
+  height: 320px;
+  border-radius: 8px;
+  border: 10px solid white;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.qr-watermark {
+  position: absolute;
+  bottom: -30px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.qr-test-info {
+  margin-top: 30px;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.qr-content-box {
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 15px 0;
+  font-family: 'Monaco', 'Courier New', monospace;
+  word-break: break-all;
+  font-size: 14px;
+}
+
+.test-note {
+  color: #666;
+  font-style: italic;
+  margin-top: 10px;
+}
+
+.debug-info {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f0f0f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+.btn-small {
+  padding: 5px 10px;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.registration-container {
+  max-width: 760px;
+  margin: 20px auto;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  color: #0f172a;
+  padding: 18px;
+}
+
+.registration-header p { color: #6b7280; margin-top: 6px; }
+
+.registration-form { margin-top: 14px; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; margin-bottom: 6px; font-weight: 600; }
+.form-group input { width: 100%; max-width: 420px; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 15px; }
+
+.btn { padding: 10px 14px; border-radius: 10px; cursor: pointer; border: none; }
+.btn-primary { background: #0b79f7; color: #fff; }
+.btn-outline { background: transparent; border: 1px solid #e5e7eb; }
+
+.qr-result { margin-top: 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.qr-preview { padding: 12px; background: #ffffff; border-radius: 10px; border: 1px solid rgba(0,0,0,0.06); }
+.qr-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
