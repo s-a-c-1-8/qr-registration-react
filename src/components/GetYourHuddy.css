@@ -1,72 +1,221 @@
-/* src/pages/GetYourHuddy.css */
+/* GetYourHuddy.css (Option B: Light Simple Scanner UI)
+   Mobile-first, clean, accessible
+*/
+
 .get-huddy-root {
   max-width: 920px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #0f172a;
 }
 
+/* Header text */
+.get-huddy-root h2 {
+  margin: 6px 0 4px;
+  font-size: 20px;
+}
+.get-huddy-root p {
+  margin: 0 0 10px;
+  color: #334155;
+  font-size: 14px;
+}
+
+/* Scanner area */
 .scanner-area {
   margin-top: 12px;
   border-radius: 12px;
   overflow: hidden;
-  background: #f8fafc;
-  padding: 8px;
+  background: #ffffff;
+  padding: 12px;
+  border: 1px solid #e6e9ee;
+  box-shadow: 0 6px 18px rgba(12, 20, 40, 0.04);
 }
 
-.result-area {
-  margin-top: 14px;
-  min-height: 90px;
+/* top controls row */
+.scanner-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.camera-label {
+  font-size: 13px;
+  color: #475569;
+}
+.scanner-controls { display:flex; gap:8px; }
+
+/* shared button (uses same look as btn-home but small) */
+.btn-home {
+  background: #4267b2;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  transition: transform 0.12s ease, background .12s ease;
+}
+.btn-home:hover { transform: translateY(-2px); background: #2f4d8c; }
+
+/* camera wrapper: square box that holds video */
+.camera-wrapper {
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 1;
+  background: #f8fafc;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border: 1px solid #e6e9ee;
+}
+
+/* the video element */
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* skeleton / initializing overlay */
+.skeleton {
+  background: linear-gradient(90deg, #f8fafc 0%, #eef3f7 50%, #f8fafc 100%);
+  background-size: 200% 100%;
+  animation: glide 1.6s linear infinite;
+}
+@keyframes glide {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* scan frame + animated line */
+.scan-frame {
+  pointer-events: none;
+  position: absolute;
+  inset: 12%;
+  border-radius: 14px;
+  border: 2px dashed rgba(60, 92, 180, 0.14);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.scan-line {
+  width: 60%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #2563eb, transparent);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.14);
+  animation: scanMove 1.6s linear infinite;
+  border-radius: 2px;
+}
+@keyframes scanMove {
+  0% { transform: translateY(-60%); opacity: 0; }
+  8% { opacity: 1; transform: translateY(-45%); }
+  50% { transform: translateY(45%); opacity: 1; }
+  92% { opacity: 1; }
+  100% { transform: translateY(-60%); opacity: 0; }
+}
+
+/* loading spinner overlay */
+.camera-loading {
+  position: absolute;
+  inset: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(255,255,255,0.6);
+  z-index: 6;
+}
+.loading-spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 4px solid rgba(37,99,235,0.12);
+  border-top-color: #2563eb;
+  animation: spin 900ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- result modal (centered) ---------- */
+.result-modal {
+  position: fixed;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(8, 10, 15, 0.45);
+  z-index: 9999;
+  padding: 18px;
 }
 
-.result-card {
-  border-radius: 10px;
-  padding: 14px 18px;
-  min-width: 320px;
-  text-align: center;
-  box-shadow: 0 6px 18px rgba(12, 20, 40, 0.06);
-}
-
-.result-area.loading .result-card {
-  background: #fff9e6;
-  border: 1px solid #ffe08a;
-}
-
-.result-area.success .result-card {
-  background: #ecfdf5;
-  border: 1px solid #34d399;
-}
-
-.result-area.taken .result-card {
-  background: #fff1f2;
-  border: 1px solid #fda4af;
-}
-
-.result-area.notfound .result-card {
-  background: #fff7ed;
-  border: 1px solid #fbbf24;
-}
-
-.result-area.error .result-card {
-  background: #fff1f2;
-  border: 1px solid #f87171;
-}
-
-.result-title {
-  font-weight: 700;
-  font-size: 1.05rem;
-  margin-bottom: 6px;
-}
-
-.result-text {
-  font-size: 0.95rem;
+/* dialog */
+.result-dialog {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e6e9ee;
+  box-shadow: 0 20px 50px rgba(12, 20, 40, 0.12);
+  padding: 18px;
+  position: relative;
   color: #0f172a;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
 }
 
-.result-sub {
-  margin-top: 8px;
-  font-size: 0.85rem;
-  color: #334155;
+/* type styles */
+.result-dialog.success { border-left: 4px solid #34d399; }
+.result-dialog.taken { border-left: 4px solid #fda4af; }
+.result-dialog.notfound { border-left: 4px solid #fbbf24; }
+.result-dialog.error { border-left: 4px solid #f87171; }
+.result-dialog.loading { border-left: 4px solid #60a5fa; }
+
+/* close button */
+.modal-close {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  background: transparent;
+  color: #475569;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+}
+.modal-close:focus { outline: 3px solid rgba(37,99,235,0.16); }
+
+/* body */
+.result-body { text-align: center; }
+.result-emoji { font-size: 36px; margin-bottom: 4px; }
+.result-title { font-weight: 700; font-size: 18px; color: #0f172a; margin-bottom: 6px; }
+.result-text-large { color: #334155; font-size: 15px; line-height: 1.3; }
+.result-sub { margin-top: 8px; color: #475569; font-size: 14px; }
+
+/* actions */
+.result-actions { display:flex; justify-content:center; gap:8px; margin-top: 8px; }
+
+/* small helpers */
+code { background: #f1f5f9; padding: 4px 6px; border-radius: 6px; font-family: monospace; }
+
+/* responsive */
+@media (max-width: 520px) {
+  .get-huddy-root { padding: 10px; }
+  .btn-home { padding: 8px 10px; font-size: 14px; }
+  .camera-wrapper { aspect-ratio: 1; }
+  .result-dialog { max-width: 92%; padding: 14px; }
+  .result-title { font-size: 16px; }
+  .result-text-large { font-size: 14px; }
+}
+
+/* reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .scan-line, .glide, .loading-spinner { animation: none !important; }
 }

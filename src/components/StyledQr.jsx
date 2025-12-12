@@ -13,7 +13,7 @@ const GeneratedQR = ({ userData, onBack }) => {
         height: 300,
         data: userData.uniqueId,
         dotsOptions: {
-          color: "#4267b2",
+          color: "#000000",
           type: "rounded",
         },
         backgroundOptions: {

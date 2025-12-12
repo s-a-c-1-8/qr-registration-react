@@ -2,16 +2,22 @@
 import { useRef, useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import QRCodeStyling from "qr-code-styling";
-import { saveUser } from "../lib/supabaseClient"; // <- new import
+import { saveUser } from "../lib/supabaseClient";
+import { useNavigate } from "react-router-dom";
+import "./RegistrationForm.css";
 
 const RegistrationForm = ({ onSuccess }) => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [generatedQRData, setGeneratedQRData] = useState(null);
+
   const qrRef = useRef(null);
   const [qrCode, setQrCode] = useState(null);
   const [qrReady, setQrReady] = useState(false);
@@ -44,15 +50,12 @@ const RegistrationForm = ({ onSuccess }) => {
     return true;
   };
 
-  // Initialize QR code when generatedQRData changes
+  // Render QR Code once data is ready
   useEffect(() => {
     if (generatedQRData?.uniqueId && qrRef.current) {
       setQrReady(false);
 
-      // Clear any existing QR code
-      if (qrRef.current) {
-        qrRef.current.innerHTML = "";
-      }
+      qrRef.current.innerHTML = "";
 
       const qr = new QRCodeStyling({
         width: 300,
@@ -74,41 +77,25 @@ const RegistrationForm = ({ onSuccess }) => {
         },
       });
 
-      // Append QR code to the div
       qr.append(qrRef.current);
       setQrCode(qr);
 
-      // Force a small delay to ensure rendering
-      setTimeout(() => {
-        setQrReady(true);
-      }, 100);
+      setTimeout(() => setQrReady(true), 120);
     }
   }, [generatedQRData]);
 
   const downloadQRCode = () => {
     if (qrCode) {
       qrCode.download({
-        name: `qr-code-${formData.name.replace(/\s+/g, "-").toLowerCase()}`,
+        name: `qr-${formData.name.replace(/\s+/g, "-").toLowerCase()}`,
         extension: "png",
       });
-      toast.success("QR code downloaded successfully!");
+      toast.success("QR code downloaded!");
     } else {
-      toast.error("QR code not ready yet. Please wait a moment.");
+      toast.error("QR code not ready yet.");
     }
   };
 
-  const copyToClipboard = async () => {
-    if (generatedQRData?.uniqueId) {
-      try {
-        await navigator.clipboard.writeText(generatedQRData.uniqueId);
-        toast.success("Unique ID copied to clipboard!");
-      } catch (err) {
-        toast.error("Failed to copy to clipboard");
-      }
-    }
-  };
-
-  // In RegistrationForm.jsx, keep only the form submission logic
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -117,55 +104,42 @@ const RegistrationForm = ({ onSuccess }) => {
     setIsSubmitting(true);
 
     try {
-      // Simulate slight delay or pre-save operations
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((r) => setTimeout(r, 300));
+      const suffix = 2000 + Math.floor(Math.random() * 1000); // 2000–2999
+      const numericId = Number(`${Date.now()}${suffix}`);
 
-      // Generate unique ID
       const uniqueId = `USER-${Date.now()}-${Math.random()
         .toString(36)
         .substr(2, 9)}`;
 
       const userData = {
+        id: numericId,
         name: formData.name.trim(),
         email: formData.email.trim(),
         uniqueId,
-        created_at: new Date().toISOString(), // optional, your DB may add this server-side
+        created_at: new Date().toISOString(),
       };
 
-      // Save to Supabase BEFORE revealing the QR
       const res = await saveUser(userData);
 
       if (!res.success) {
-        // If Supabase returned an error, show friendly message.
-        // Log error details are already in saveUser
-        toast.error(
-          "Failed to save registration. If the problem persists, contact the administrator."
-        );
+        toast.error("Failed to save registration!");
         setIsSubmitting(false);
         return;
       }
 
-      // Use returned row data if provided (res.data), otherwise fall back to userData
       const savedUser = res.data ?? userData;
 
-      // Set the generated data so QR effect/useEffect runs
       setGeneratedQRData(savedUser);
       setRegistrationComplete(true);
 
-      // App-level callback (if you still want to notify the parent)
       if (typeof onSuccess === "function") {
-        try {
-          onSuccess(savedUser);
-        } catch (err) {
-          // swallow parent callback errors but log them
-          console.error("onSuccess callback error:", err);
-        }
+        onSuccess(savedUser);
       }
 
-      toast.success("Registration completed and saved successfully!");
-    } catch (error) {
-      toast.error("Registration failed. Please try again.");
-      console.error("Registration error:", error);
+      toast.success("Registration successful!");
+    } catch (err) {
+      toast.error("Registration failed!");
     } finally {
       setIsSubmitting(false);
     }
@@ -177,19 +151,18 @@ const RegistrationForm = ({ onSuccess }) => {
     setFormData({ name: "", email: "" });
     setQrCode(null);
     setQrReady(false);
-
-    // Clear QR container
-    if (qrRef.current) {
-      qrRef.current.innerHTML = "";
-    }
+    if (qrRef.current) qrRef.current.innerHTML = "";
   };
 
+  const goHome = () => navigate("/");
+
+  // -------------------- SUCCESS SCREEN --------------------
   if (registrationComplete && generatedQRData) {
     return (
       <div className="registration-container">
         <div className="registration-header">
-          <h2>Registration Complete!</h2>
-          <p>Your unique QR code has been generated</p>
+          <h2>Registration Complete</h2>
+          <p>Show this QR at the entrance</p>
         </div>
 
         <div className="qr-success-content">
@@ -197,9 +170,10 @@ const RegistrationForm = ({ onSuccess }) => {
             {!qrReady && (
               <div className="qr-loading">
                 <div className="loading-spinner"></div>
-                <p>Generating QR code...</p>
+                <p>Generating QR...</p>
               </div>
             )}
+
             <div className="qr-code-preview">
               <div ref={qrRef} className="qr-canvas" />
             </div>
@@ -210,59 +184,16 @@ const RegistrationForm = ({ onSuccess }) => {
                 onClick={downloadQRCode}
                 disabled={!qrReady}
               >
-                {qrReady ? "Download QR Code" : "Preparing QR..."}
-              </button>
-              <button className="btn btn-secondary" onClick={copyToClipboard}>
-                Copy ID
+                {qrReady ? "Download QR Code" : "Preparing..."}
               </button>
             </div>
-          </div>
-
-          <div className="user-info-section">
-            <h3>Registration Details</h3>
-            <div className="info-card">
-              <div className="info-row">
-                <span className="info-label">Name:</span>
-                <span className="info-value">{generatedQRData.name}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Email:</span>
-                <span className="info-value">{generatedQRData.email}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Unique ID:</span>
-                <div className="unique-id-display">
-                  <code>{generatedQRData.uniqueId}</code>
-                  <button
-                    className="copy-icon-btn"
-                    onClick={copyToClipboard}
-                    title="Copy ID"
-                  >
-                    📋
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="usage-guide">
-              <h4>How to use your QR code:</h4>
-              <ul>
-                <li>Save the QR code to your device</li>
-                <li>Print it for physical access</li>
-                <li>Share digitally for verification</li>
-                <li>Use it for event check-ins</li>
-              </ul>
-            </div>
-
-            <button className="btn btn-outline" onClick={handleReset}>
-              Register Another Person
-            </button>
           </div>
         </div>
       </div>
     );
   }
 
+  // -------------------- REGISTRATION FORM SCREEN --------------------
   return (
     <div className="registration-container">
       <div className="registration-header">
@@ -272,7 +203,6 @@ const RegistrationForm = ({ onSuccess }) => {
 
       <form onSubmit={handleSubmit} className="registration-form">
         <div className="form-group">
-          <label htmlFor="name">Full Name *</label>
           <input
             type="text"
             id="name"
@@ -286,14 +216,13 @@ const RegistrationForm = ({ onSuccess }) => {
         </div>
 
         <div className="form-group">
-          <label htmlFor="email">Email Address *</label>
           <input
             type="email"
             id="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
-            placeholder="Enter your email address"
+            placeholder="Enter your email"
             required
             disabled={isSubmitting}
           />
@@ -307,16 +236,6 @@ const RegistrationForm = ({ onSuccess }) => {
           {isSubmitting ? "Registering..." : "Register & Generate QR"}
         </button>
       </form>
-
-      <div className="registration-info">
-        <h4>What happens next?</h4>
-        <ul>
-          <li>Fill in your details above</li>
-          <li>Submit the form</li>
-          <li>Get your unique QR code</li>
-          <li>Download and use your QR code</li>
-        </ul>
-      </div>
     </div>
   );
 };

@@ -1,8 +1,8 @@
 // src/pages/GetYourHuddy.jsx
-import React, { useCallback, useRef, useState } from "react";
-import ScanQR from "../components/ScanQR";
+import React, { useEffect, useRef, useState } from "react";
+import QrScanner from "qr-scanner";
 import { getUserByUniqueId, markHuddyTaken } from "../lib/supabaseClient";
-import "./GetYourHuddy.css"; // optional - create to style messages
+import "./GetYourHuddy.css";
 
 const playTone = (opts = { freq: 880, duration: 0.12, type: "sine" }) => {
   try {
@@ -23,174 +23,405 @@ const playTone = (opts = { freq: 880, duration: 0.12, type: "sine" }) => {
       ctx.currentTime + opts.duration
     );
     o.stop(ctx.currentTime + opts.duration + 0.02);
-    // close context after tone finishes
-    setTimeout(() => {
-      try {
-        ctx.close();
-      } catch (_) {}
-    }, (opts.duration + 0.05) * 1000);
+    setTimeout(() => ctx.close(), (opts.duration + 0.05) * 1000);
   } catch (e) {
-    // ignore
+    // ignore audio errors
   }
 };
 
-const GetYourHuddy = () => {
-  const [status, setStatus] = useState("idle"); // idle | loading | success | taken | notfound | error
-  const [message, setMessage] = useState("");
-  const [user, setUser] = useState(null);
-  const lastScannedRef = useRef(null); // avoid duplicate handling for same QR in quick succession
-  const cooldownRef = useRef(null);
+const preferRearRegex = /(back|rear|environment|wide|rear camera)/i;
 
-  const handleQRScan = useCallback(async (scannedData) => {
-    // basic guard: prevent handling same code repeatedly within a short cooldown
-    if (!scannedData) return;
-    if (lastScannedRef.current === scannedData) {
-      // ignore duplicate scan
-      return;
+const GetYourHuddy = () => {
+  const videoRef = useRef(null);
+  const scannerRef = useRef(null);
+  const mountedRef = useRef(true);
+  const lastScannedRef = useRef(null);
+  const cooldownRef = useRef(null);
+  const resultDelayRef = useRef(null);
+
+  // UI state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState(""); // success | error | taken | notfound | loading
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalUser, setModalUser] = useState(null);
+  const [cameraList, setCameraList] = useState([]);
+  const [activeCameraLabel, setActiveCameraLabel] = useState("");
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  const findRearCameraId = (list = []) => {
+    if (!Array.isArray(list)) return null;
+    const idx = list.findIndex((c) => preferRearRegex.test(c.label || ""));
+    return idx === -1 ? null : list[idx].id;
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    (async () => {
+      let cams = [];
+      try {
+        cams = await QrScanner.listCameras(true);
+      } catch (e) {
+        // ignore enumerate errors — we'll try environment/user fallback
+      }
+      if (mountedRef.current && cams && cams.length) {
+        setCameraList(cams);
+      }
+
+      // Try prioritized start sequence:
+      // 1) labeled rear camera id if available
+      // 2) "environment" (preferred by browsers for back camera)
+      // 3) "user" as last resort
+      const rearId = findRearCameraId(cams);
+      let started = false;
+
+      if (rearId) {
+        started = await startScanner(rearId, false);
+      }
+
+      if (!started) {
+        // try environment
+        started = await startScanner("environment", false);
+      }
+
+      if (!started) {
+        // last resort: user (front)
+        started = await startScanner("user", false);
+      }
+
+      if (!started) {
+        // all attempts failed — show single helpful error
+        openModal(
+          "error",
+          "Unable to access camera. Please allow camera permission and reload the page."
+        );
+      }
+    })();
+
+    const onKey = (e) => {
+      if (e.key === "Escape" && modalOpen) closeModal();
+    };
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener("keydown", onKey);
+      stopScanner();
+      clearTimeout(cooldownRef.current);
+      clearTimeout(resultDelayRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // startScanner attempts to start and returns true/false
+  // if showModalOnError is true, it will open an error modal on failure.
+  const startScanner = async (
+    preferredCamera = "environment",
+    showModalOnError = true
+  ) => {
+    if (!videoRef.current) return false;
+    if (scannerRef.current) return true; // already running
+
+    setIsInitializing(true);
+    setModalOpen(false);
+    setModalMessage("");
+    setModalType("");
+    setModalUser(null);
+
+    try {
+      const scanner = new QrScanner(
+        videoRef.current,
+        (result) => handleScanResult(result),
+        {
+          preferredCamera,
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+        }
+      );
+
+      scannerRef.current = scanner;
+      await scanner.start();
+
+      // update active camera label if available
+      try {
+        const active = scanner.getCamera?.();
+        if (active) setActiveCameraLabel(active.label || "");
+      } catch (e) {
+        // ignore
+      }
+
+      // small stabilization
+      await new Promise((r) => setTimeout(r, 220));
+      if (!mountedRef.current) return false;
+      setIsInitializing(false);
+      return true;
+    } catch (err) {
+      console.warn("startScanner attempt failed for", preferredCamera, err);
+      setIsInitializing(false);
+      // only show modal on final failure if requested by caller
+      if (showModalOnError) {
+        openModal(
+          "error",
+          "Unable to access camera. Please allow camera permission and retry."
+        );
+      }
+      // ensure scanner is cleaned up
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.destroy();
+        } catch (_) {}
+        scannerRef.current = null;
+      }
+      return false;
     }
-    lastScannedRef.current = scannedData;
+  };
+
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      try {
+        scannerRef.current.stop();
+        scannerRef.current.destroy();
+      } catch (e) {
+        // ignore
+      }
+      scannerRef.current = null;
+    }
+  };
+
+  // Helper to schedule final modal after a 2s pause
+  const scheduleFinalModal = (type, message, user = null) => {
+    clearTimeout(resultDelayRef.current);
+    resultDelayRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
+      openModal(type, message, user);
+    }, 2000);
+  };
+
+  const handleScanResult = async (result) => {
+    const scanned =
+      typeof result === "string"
+        ? result
+        : String(result?.data ?? result ?? "");
+    if (!scanned) return;
+
+    if (lastScannedRef.current === scanned) return;
+    lastScannedRef.current = scanned;
     clearTimeout(cooldownRef.current);
     cooldownRef.current = setTimeout(() => {
       lastScannedRef.current = null;
-    }, 4000); // allow re-scan after 4s
+    }, 3000);
 
-    setStatus("loading");
-    setMessage("Looking up user...");
-    setUser(null);
+    // Stop scanner and show immediate loading modal
+    stopScanner();
+    openModal("loading", "Looking up user...");
 
     try {
-      // fetch user by uniqueId
-      const res = await getUserByUniqueId(scannedData);
-      if (!res.success) {
-        setStatus("error");
-        setMessage("Lookup failed — network or server problem.");
+      const res = await getUserByUniqueId(scanned);
+      if (!res || res.success === false) {
+        scheduleFinalModal(
+          "error",
+          "Lookup failed — network or server problem."
+        );
         playTone({ freq: 220, duration: 0.12, type: "sawtooth" });
         return;
       }
 
       const row = res.data;
       if (!row) {
-        setStatus("notfound");
-        setMessage("User does not exist — please register.");
+        scheduleFinalModal(
+          "notfound",
+          "User does not exist — please register."
+        );
         playTone({ freq: 220, duration: 0.12, type: "triangle" });
         return;
       }
 
-      // user found
-      setUser(row);
+      setModalUser(row);
 
-      // if isHuddy is truthy (true), they already took it
+      if (!row.isEntered) {
+        scheduleFinalModal(
+          "error",
+          "User not entered — cannot claim huddy.",
+          row
+        );
+        playTone({ freq: 220, duration: 0.12, type: "triangle" });
+        return;
+      }
+
       if (row.isHuddy) {
-        setStatus("taken");
-        setMessage("Sorry, you took your huddy.");
+        scheduleFinalModal(
+          "taken",
+          "Huddy has already been claimed for this user.",
+          row
+        );
         playTone({ freq: 300, duration: 0.12, type: "triangle" });
         return;
       }
 
-      // otherwise update DB to mark huddy taken
-      setMessage("Marking huddy as claimed...");
-      const upd = await markHuddyTaken(scannedData);
-      if (!upd.success) {
-        setStatus("error");
-        setMessage("Failed to update. Try again or contact support.");
+      setModalMessage("Marking huddy as claimed...");
+      const upd = await markHuddyTaken(scanned);
+
+      if (!upd || upd.success === false) {
+        const reason = upd?.reason;
+        if (reason === "not_found") {
+          scheduleFinalModal("notfound", "User not found (during update).");
+        } else if (reason === "not_entered") {
+          scheduleFinalModal("error", "User not entered — cannot claim huddy.");
+        } else if (reason === "already_taken") {
+          scheduleFinalModal("taken", "Huddy was already claimed.");
+        } else {
+          scheduleFinalModal(
+            "error",
+            "Failed to update. Try again or contact support."
+          );
+        }
         playTone({ freq: 220, duration: 0.12, type: "triangle" });
         return;
       }
 
-      // success
-      setStatus("success");
-      setUser(upd.data ?? row);
-      setMessage("Get your huddy — Enjoy!");
+      scheduleFinalModal("success", "Huddy claimed — enjoy!", upd.data ?? row);
       playTone({ freq: 880, duration: 0.12, type: "sine" });
     } catch (e) {
-      console.error("handleQRScan exception:", e);
-      setStatus("error");
-      setMessage("Unexpected error. See console for details.");
+      console.error("handleScanResult exception:", e);
+      scheduleFinalModal(
+        "error",
+        "Unexpected error while processing the scan."
+      );
       playTone({ freq: 220, duration: 0.12, type: "triangle" });
-    } finally {
-      // clear message + user after a short display, or keep visible depending on UX preference
-      // Here we'll keep result visible for 5s and then go back to idle so ScanQR can resume scanning.
-      clearTimeout(cooldownRef.current);
-      cooldownRef.current = setTimeout(() => {
-        setStatus("idle");
-        setMessage("");
-        setUser(null);
-        lastScannedRef.current = null;
-      }, 5000);
     }
-  }, []);
+  };
+
+  const openModal = (type = "error", message = "", user = null) => {
+    setModalType(type);
+    setModalMessage(message);
+    setModalUser(user ?? null);
+    setModalOpen(true);
+  };
+
+  const closeModal = async () => {
+    setModalOpen(false);
+    setModalType("");
+    setModalMessage("");
+    setModalUser(null);
+    clearTimeout(resultDelayRef.current);
+    await new Promise((r) => setTimeout(r, 120));
+    // restart scanner preferring rear camera again
+    const rearId = findRearCameraId(cameraList);
+    let started = false;
+    if (rearId) {
+      started = await startScanner(rearId, false);
+    }
+    if (!started) {
+      started = await startScanner("environment", false);
+    }
+    if (!started) {
+      await startScanner("user", true); // show error if this final attempt fails
+    }
+  };
 
   return (
     <div className="get-huddy-root">
-      <h2>Get Your Huddy</h2>
-      <p>Scan the user QR to claim their huddy.</p>
+      <h2 style={{ marginBottom: "12px", textAlign: "center" }}>
+        Get Your Gift
+      </h2>
 
       <div className="scanner-area">
-        <ScanQR onQRScan={handleQRScan} />
+        <div className="scanner-top">
+          <div className="camera-label">
+            {isInitializing
+              ? "Initializing camera…"
+              : activeCameraLabel || "Camera"}
+          </div>
+        </div>
+
+        <div className={`camera-wrapper ${isInitializing ? "skeleton" : ""}`}>
+          <video
+            ref={videoRef}
+            className="camera-video"
+            playsInline
+            muted
+            autoPlay
+            aria-label="QR scanner camera"
+          />
+          {!isInitializing && (
+            <div className="scan-frame" aria-hidden="true">
+              <div className="scan-line" />
+            </div>
+          )}
+          {isInitializing && (
+            <div className="camera-loading">
+              <div className="loading-spinner" />
+            </div>
+          )}
+        </div>
       </div>
 
-      <div
-        className={`result-area ${
-          status === "loading"
-            ? "loading"
-            : status === "success"
-            ? "success"
-            : status === "taken"
-            ? "taken"
-            : status === "notfound"
-            ? "notfound"
-            : status === "error"
-            ? "error"
-            : "idle"
-        }`}
-        aria-live="polite"
-      >
-        {status === "loading" && (
-          <div className="result-card">
-            <div className="result-title">Checking...</div>
-            <div className="result-text">{message}</div>
-          </div>
-        )}
+      {/* Modal popup for results */}
+      {modalOpen && (
+        <div
+          className="result-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-live="assertive"
+        >
+          <div className={`result-dialog ${modalType}`}>
+            <button
+              className="modal-close"
+              aria-label="Close"
+              onClick={closeModal}
+            >
+              ×
+            </button>
 
-        {status === "success" && user && (
-          <div className="result-card">
-            <div className="result-title">Get your huddy</div>
-            <div className="result-text">
-              {user.name ? `Hello ${user.name}!` : "Success!"}
-            </div>
-            <div className="result-sub">
-              Unique ID: <code>{user.uniqueId}</code>
-            </div>
-          </div>
-        )}
+            <div className="result-body">
+              <div className="result-emoji">
+                {modalType === "success"
+                  ? "✅"
+                  : modalType === "taken"
+                  ? "⚠️"
+                  : modalType === "notfound"
+                  ? "🔍"
+                  : modalType === "loading"
+                  ? "⏳"
+                  : "❗"}
+              </div>
 
-        {status === "taken" && user && (
-          <div className="result-card">
-            <div className="result-title">Already claimed</div>
-            <div className="result-text">
-              {user.name ? `Hey ${user.name},` : ""}
-              {" Sorry, you took your huddy."}
-            </div>
-            <div className="result-sub">
-              Unique ID: <code>{user.uniqueId}</code>
-            </div>
-          </div>
-        )}
+              <div className="result-title">
+                {modalType === "success"
+                  ? "Huddy Claimed"
+                  : modalType === "taken"
+                  ? "Already Claimed"
+                  : modalType === "notfound"
+                  ? "Not Found"
+                  : modalType === "loading"
+                  ? "Working..."
+                  : "Notice"}
+              </div>
 
-        {status === "notfound" && (
-          <div className="result-card">
-            <div className="result-title">Not found</div>
-            <div className="result-text">{message}</div>
-          </div>
-        )}
+              <div className="result-text-large">{modalMessage}</div>
 
-        {status === "error" && (
-          <div className="result-card">
-            <div className="result-title">Error</div>
-            <div className="result-text">{message}</div>
+              {modalUser && (
+                <div className="result-sub">
+                  {modalUser.name && (
+                    <div>
+                      <strong>{modalUser.name}</strong>
+                    </div>
+                  )}
+                  <div>
+                    Unique ID: <code>{modalUser.uniqueId}</code>
+                  </div>
+                </div>
+              )}
+
+              <div className="result-actions">
+                <button className="btn-home" onClick={closeModal}>
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

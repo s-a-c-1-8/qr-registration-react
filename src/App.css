@@ -1,203 +1,161 @@
-/* Registration Success Styles */
-.qr-success-content {
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Inter", sans-serif;
+}
+
+/* App Container */
+.App {
+  background: #f6f7fb;
+  min-height: 100vh;
+  padding: 20px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
   justify-content: center;
-  align-items: flex-start;
-  margin: 2rem 0;
-}
-
-.qr-display-section {
-  text-align: center;
-  flex: 0 0 auto;
-}
-
-.qr-code-preview {
-  background: white;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  margin-bottom: 1rem;
-}
-
-.qr-actions-group {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.user-info-section {
-  text-align: left;
-  background-color: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  min-width: 300px;
-  flex: 1;
-  max-width: 400px;
-}
-
-.info-card {
-  background: #f8f9fa;
-  padding: 1rem;
-  border-radius: 6px;
-  margin: 1rem 0;
-}
-
-.info-row {
-  display: flex;
-  margin-bottom: 1rem;
-  align-items: flex-start;
-}
-
-.info-label {
-  font-weight: 600;
-  width: 80px;
-  flex-shrink: 0;
-}
-
-.info-value {
-  flex: 1;
-}
-
-.unique-id-display {
-  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: #e9ecef;
-  padding: 0.5rem;
-  border-radius: 4px;
-  word-break: break-all;
 }
 
-.unique-id-display code {
-  flex: 1;
-  font-family: monospace;
-  font-size: 0.9rem;
+/* Main Content Box */
+.main-content {
+  width: 100%;
+  max-width: 500px;
+  /* background: white; */
+  padding: 35px;
+  border-radius: 16px;
+  /* box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07); */
+  animation: fadeIn 0.4s ease;
 }
 
-.copy-icon-btn {
-  background: none;
+/* Home Page Styling */
+.home-page {
+  text-align: center;
+}
+
+.home-page h1 {
+  font-size: 28px;
+  color: #000;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.home-page p {
+  color: #555;
+  margin-bottom: 30px;
+  font-size: 16px;
+}
+
+/* Action Buttons Container */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Buttons */
+.btn {
+  padding: 14px 20px;
+  font-size: 16px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
-  font-size: 1.2rem;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 4px;
-  transition: background 0.2s;
+  transition: 0.25s ease;
+  width: 100%;
 }
 
-.copy-icon-btn:hover {
-  background: #dee2e6;
-}
-
-.usage-guide {
-  margin: 1.5rem 0;
-  padding: 1rem;
-  background: #f8fff9;
-  border: 1px solid #d4edda;
-  border-radius: 6px;
-}
-
-.usage-guide h4 {
-  color: #155724;
-  margin-bottom: 0.5rem;
-}
-
-.usage-guide ul {
-  list-style-position: inside;
-  margin-top: 0.5rem;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 2px solid #6c757d;
-  color: #6c757d;
-}
-
-.btn-outline:hover {
-  background: #6c757d;
+/* Primary Button */
+.btn-primary {
+  background: #1a73e8;
   color: white;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .qr-success-content {
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .user-info-section {
-    width: 100%;
-    max-width: none;
-  }
+.btn-primary:hover {
+  background: #0f58b5;
+  transform: translateY(-2px);
 }
 
-/* QR Loading Styles */
-.qr-loading {
+/* Secondary Button */
+.btn-secondary {
+  background: #e8eaf1;
+  color: #333;
+}
+
+.btn-secondary:hover {
+  background: #d7d9e0;
+  transform: translateY(-2px);
+}
+
+/* Back Button (inside QR page, form pages) */
+.back-btn {
+  margin-top: 20px;
+  background: #f3f3f3 !important;
+  color: #444 !important;
+}
+
+.back-btn:hover {
+  background: #e1e1e1 !important;
+}
+
+/* QR Section Layout */
+.qr-container {
+  text-align: center;
+}
+
+.qr-container img {
+  width: 220px;
+  max-width: 80%;
+  margin: 20px auto;
+  display: block;
+  border-radius: 12px;
+  border: 4px solid #f0f0f0;
+}
+
+/* Forms Styling */
+form {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 320px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  margin-bottom: 1rem;
+  gap: 15px;
 }
 
-.loading-spinner {
-  width: 50px;
-  height: 50px;
-  border: 5px solid #f3f3f3;
-  border-top: 5px solid #4267b2;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
+input, select {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1.5px solid #ddd;
+  font-size: 15px;
+  transition: 0.25s;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+input:focus,
+select:focus {
+  border-color: #1a73e8;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
 }
 
-.qr-loading p {
-  color: #666;
-  font-style: italic;
+/* Fade-in Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* QR Canvas styling */
-.qr-canvas {
-  min-height: 300px;
-  min-width: 300px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .main-content {
+    padding: 25px;
+  }
 
-.qr-canvas canvas {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-}
+  .home-page h1 {
+    font-size: 24px;
+  }
 
-/* Button disabled state */
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Ensure QR container is properly sized */
-.qr-code-preview {
-  background: white;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  margin-bottom: 1rem;
-  min-height: 340px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  .btn {
+    font-size: 15px;
+    padding: 12px 16px;
+  }
 }
