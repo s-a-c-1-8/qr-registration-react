@@ -272,7 +272,6 @@ export const markAllHuddyByUniqueId = async (uniqueId) => {
  * - return { success, data, count, error }
  * ----------------------------
  */
-
 export const getEnteredUsers = async (
   page = 1,
   limit = 10,
@@ -283,27 +282,63 @@ export const getEnteredUsers = async (
     const start = (page - 1) * limit;
     const end = start + limit - 1;
 
+    // First, get distinct emails with isEntered = true using a subquery
+    const distinctQuery = supabase
+      .from("users")
+      .select("email")
+      .eq("isEntered", true)
+      .order("created_at", { ascending: false });
+
+    const { data: distinctEmails, error: distinctError } = await distinctQuery;
+
+    if (distinctError) {
+      console.error("getEnteredUsers distinct error:", distinctError);
+      return { success: false, error: distinctError };
+    }
+
+    // Get unique emails (remove duplicates)
+    const uniqueEmails = [
+      ...new Set(distinctEmails?.map((item) => item.email) || []),
+    ];
+
+    // If no unique emails found, return empty
+    if (uniqueEmails.length === 0) {
+      return { success: true, data: [], count: 0 };
+    }
+
+    // Calculate pagination for unique emails
+    const paginatedEmails = uniqueEmails.slice(start, end + 1);
+
+    // Now fetch the full user data for paginated unique emails
     const { data, error, count } = await supabase
       .from("users")
       .select("id, name, uniqueId, email, isEntered, isHuddy, created_at", {
         count: "exact",
       })
       .eq("isEntered", true)
-      .order(sortBy, { ascending: order === "asc" })
-      .range(start, end);
+      .in("email", paginatedEmails)
+      .order(sortBy, { ascending: order === "asc" });
 
     if (error) {
       console.error("getEnteredUsers error:", error);
       return { success: false, error };
     }
 
-    return { success: true, data: data ?? [], count: count ?? 0 };
+    // Remove duplicates in case same email appears multiple times
+    const uniqueUsers = Array.from(
+      new Map(data?.map((user) => [user.email, user]) || []).values()
+    );
+
+    return {
+      success: true,
+      data: uniqueUsers,
+      count: uniqueEmails.length, // Total count of unique emails
+    };
   } catch (e) {
     console.error("getEnteredUsers exception:", e);
     return { success: false, error: e };
   }
 };
-
 export const getGiftUsers = async (
   page = 1,
   limit = 10,
@@ -314,21 +349,60 @@ export const getGiftUsers = async (
     const start = (page - 1) * limit;
     const end = start + limit - 1;
 
-    const { data, error, count } = await supabase
+    // First, get distinct emails with isHuddy = true
+    const distinctQuery = supabase
       .from("users")
-      .select("id, name, uniqueId, email, isEntered, isHuddy, created_at", {
-        count: "exact",
-      })
+      .select("email")
       .eq("isHuddy", true)
-      .order(sortBy, { ascending: order === "asc" })
-      .range(start, end);
+      .order("created_at", { ascending: order === "asc" });
+
+    const { data: distinctEmails, error: distinctError } = await distinctQuery;
+
+    if (distinctError) {
+      console.error("getGiftUsers distinct error:", distinctError);
+      return { success: false, error: distinctError };
+    }
+
+    // Get unique emails (remove duplicates)
+    const uniqueEmails = [
+      ...new Set(distinctEmails?.map((item) => item.email) || []),
+    ];
+
+    // If no unique emails found, return empty
+    if (uniqueEmails.length === 0) {
+      return { success: true, data: [], count: 0 };
+    }
+
+    // Calculate pagination for unique emails
+    const paginatedEmails = uniqueEmails.slice(
+      start,
+      Math.min(end + 1, uniqueEmails.length)
+    );
+
+    // Now fetch the full user data for paginated unique emails
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, name, uniqueId, email, isEntered, isHuddy, created_at")
+      .eq("isHuddy", true)
+      .in("email", paginatedEmails)
+      .order(sortBy, { ascending: order === "asc" });
 
     if (error) {
       console.error("getGiftUsers error:", error);
       return { success: false, error };
     }
 
-    return { success: true, data: data ?? [], count: count ?? 0 };
+    // Remove duplicates in case same email appears multiple times
+    // Keep the first occurrence for each email
+    const uniqueUsers = Array.from(
+      new Map(data?.map((user) => [user.email, user]) || []).values()
+    );
+
+    return {
+      success: true,
+      data: uniqueUsers,
+      count: uniqueEmails.length, // Total count of unique emails
+    };
   } catch (e) {
     console.error("getGiftUsers exception:", e);
     return { success: false, error: e };
