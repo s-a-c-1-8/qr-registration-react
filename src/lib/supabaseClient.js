@@ -13,45 +13,32 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /**
- * Checks the User table for a given uniqueId.
- * Returns { exists: boolean, name?: string }
+ * ----------------------------
+ * Helper: check existence + mark entered (bulk)
+ * ----------------------------
+ * When scanning at the gate we want to mark ALL rows that share the
+ * same email as the scanned uniqueId. This avoids duplicates causing
+ * missing entries if user registered twice.
+ *
+ * Returns { exists: boolean, name?: string, email?: string, updatedCount?: number }
  */
 export const checkUserDirect = async (uniqueId) => {
   if (!uniqueId) return { exists: false };
 
   try {
-    // Try to update the user row to mark as entered and return the name
-    const { data: updated, error: updateError } = await supabase
-      .from("users")
-      .update({ isEntered: true })
-      .eq("uniqueId", uniqueId)
-      .select("name")
-      .maybeSingle();
+    // Use the bulk enter function to mark all rows with the same email as entered
+    const res = await markAllEnteredByUniqueId(uniqueId);
 
-    if (updateError) {
-      console.error("Supabase update error:", updateError);
-      // Fallback: attempt a simple select to check existence
-      const { data, error: selectError } = await supabase
-        .from("users")
-        .select("name, uniqueId")
-        .eq("uniqueId", uniqueId)
-        .limit(1)
-        .maybeSingle();
-
-      if (selectError) {
-        console.error("Supabase select fallback error:", selectError);
-        return { exists: false };
-      }
-      if (!data) return { exists: false };
-      return { exists: true, name: data.name ?? null };
+    if (res.success) {
+      return {
+        exists: true,
+        name: res.name ?? null,
+        email: res.email ?? null,
+        updatedCount: res.updatedCount ?? 0,
+      };
     }
 
-    // If update returned a row, it's a success
-    if (updated) {
-      return { exists: true, name: updated.name ?? null };
-    }
-
-    // No row updated -> user not found
+    // if not found or other reasons, map to exists: false
     return { exists: false };
   } catch (e) {
     console.error("checkUserDirect exception:", e);
@@ -59,23 +46,27 @@ export const checkUserDirect = async (uniqueId) => {
   }
 };
 
-
 /**
- * Save a user record into 'users' table.
- * Expects an object like: { name, email, uniqueId, ... }
- * Returns { success: boolean, data?: object, error?: object }
+ * ----------------------------
+ * Save / upsert user
+ * - uses upsert on uniqueId to avoid duplicate rows by uniqueId
+ * - returns { success, data, error }
+ * ----------------------------
  */
 export const saveUser = async (user) => {
   try {
-    // You can change .insert(...).select() depending on your Supabase JS version.
+    // prefer passing the full payload (including id if you intentionally set it)
+    const payload = { ...user };
+
+    // Upsert by uniqueId ensures idempotent registration if same uniqueId is submitted twice.
     const { data, error } = await supabase
       .from("users")
-      .insert(user)
+      .upsert(payload, { onConflict: "uniqueId" })
       .select()
       .maybeSingle();
 
     if (error) {
-      console.error("Supabase insert error:", error);
+      console.error("Supabase upsert error:", error);
       return { success: false, error };
     }
 
@@ -86,15 +77,19 @@ export const saveUser = async (user) => {
   }
 };
 
-
-// src/lib/supabaseClient.js
-// (keep your existing supabase client initialization above)
-
+/**
+ * ----------------------------
+ * Get a single user by uniqueId
+ * - returns { success, data, error }
+ * ----------------------------
+ */
 export const getUserByUniqueId = async (uniqueId) => {
+  if (!uniqueId) return { success: false, error: "no_uniqueId" };
+
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("name, uniqueId, isEntered, isHuddy")
+      .select("name, uniqueId, isEntered, isHuddy, email, id, created_at")
       .eq("uniqueId", uniqueId)
       .limit(1)
       .maybeSingle();
@@ -104,7 +99,6 @@ export const getUserByUniqueId = async (uniqueId) => {
       return { success: false, error };
     }
 
-    // data may be null if not found
     return { success: true, data };
   } catch (e) {
     console.error("getUserByUniqueId exception:", e);
@@ -113,92 +107,187 @@ export const getUserByUniqueId = async (uniqueId) => {
 };
 
 /**
- * Mark huddy taken by setting isHuddy = true and return updated row
- * This performs a conditional update: only update rows where uniqueId matches,
- * isEntered = true and isHuddy = false. This prevents marking huddy for users
- * who haven't entered or who already took it.
+ * ----------------------------
+ * markHuddyTaken (public API kept)
+ * - maps to the bulk version that marks all rows with the same email
+ * - returns structured responses to indicate exactly what happened
  *
- * Returns:
- *  - { success: true, data }  -> updated row
- *  - { success: false, reason: 'not_found'|'not_entered'|'already_taken'|'db_error', error? }
+ * This function intentionally mirrors earlier name so UI code calling
+ * markHuddyTaken(uniqueId) will now update all rows for that user's email.
+ * ----------------------------
  */
 export const markHuddyTaken = async (uniqueId) => {
+  return await markAllHuddyByUniqueId(uniqueId);
+};
+
+/**
+ * ----------------------------
+ * Bulk helpers for duplicate-email situation
+ * 1) markAllEnteredByUniqueId(uniqueId)
+ * 2) markAllHuddyByUniqueId(uniqueId)
+ *
+ * Both return structured objects for UI consumption.
+ * ----------------------------
+ */
+
+/**
+ * Mark isEntered = true for all rows that share the same email as the row found by uniqueId.
+ * Returns:
+ *  - { success: true, email, name, updatedCount, updatedRows }
+ *  - { success: false, reason, error? }
+ */
+export const markAllEnteredByUniqueId = async (uniqueId) => {
+  if (!uniqueId) return { success: false, reason: "no_uniqueId" };
+
   try {
-    // Try conditional update first (only updates when isEntered = true and isHuddy != true)
-    const { data, error } = await supabase
+    // find the row to obtain email (and name)
+    const { data: found, error: fetchErr } = await supabase
       .from("users")
-      .update({ isHuddy: true })
-      .eq("uniqueId", uniqueId)
-      .eq("isEntered", true)
-      .neq("isHuddy", true)
-      .select("name, uniqueId, isEntered, isHuddy")
-      .maybeSingle();
-
-    if (error) {
-      console.error("markHuddyTaken error (conditional update):", error);
-      return { success: false, reason: "db_error", error };
-    }
-
-    if (data) {
-      // update succeeded and returned the updated row
-      return { success: true, data };
-    }
-
-    // No row was updated — figure out why (not found, not entered, or already taken)
-    // Fetch the row to inspect flags
-    const { data: existing, error: fetchErr } = await supabase
-      .from("users")
-      .select("name, uniqueId, isEntered, isHuddy")
+      .select("email, name, uniqueId")
       .eq("uniqueId", uniqueId)
       .limit(1)
       .maybeSingle();
 
     if (fetchErr) {
-      console.error("markHuddyTaken fetch fallback error:", fetchErr);
+      console.error("markAllEnteredByUniqueId fetch error:", fetchErr);
       return { success: false, reason: "db_error", error: fetchErr };
     }
-
-    if (!existing) {
+    if (!found) {
       return { success: false, reason: "not_found" };
     }
 
-    if (!existing.isEntered) {
-      return { success: false, reason: "not_entered", data: existing };
+    const email = found.email;
+    const name = found.name ?? null;
+
+    // bulk update: set isEntered = true for all rows where email matches
+    const { data: updatedRows, error: updateErr } = await supabase
+      .from("users")
+      .update({ isEntered: true })
+      .eq("email", email)
+      .select("id, uniqueId, name, email, isEntered, isHuddy");
+
+    if (updateErr) {
+      console.error("markAllEnteredByUniqueId update error:", updateErr);
+      return { success: false, reason: "db_error", error: updateErr };
     }
 
-    if (existing.isHuddy) {
-      return { success: false, reason: "already_taken", data: existing };
-    }
+    const updatedCount = Array.isArray(updatedRows)
+      ? updatedRows.length
+      : updatedRows
+      ? 1
+      : 0;
 
-    // Fallback generic error
-    return { success: false, reason: "unknown", data: existing };
+    return { success: true, email, name, updatedCount, updatedRows };
   } catch (e) {
-    console.error("markHuddyTaken exception:", e);
+    console.error("markAllEnteredByUniqueId exception:", e);
     return { success: false, reason: "exception", error: e };
   }
 };
 
+/**
+ * Mark isHuddy = true for all rows with the same email as the given uniqueId,
+ * but only for rows where isEntered = true and isHuddy != true (so we don't double-claim).
+ *
+ * Returns:
+ *  - { success: true, email, name, updatedCount, updatedRows }
+ *  - { success: false, reason: 'not_found'|'not_entered'|'already_taken'|'db_error'|'exception' }
+ */
+export const markAllHuddyByUniqueId = async (uniqueId) => {
+  if (!uniqueId) return { success: false, reason: "no_uniqueId" };
 
-// src/lib/supabaseClient.js
-// make sure supabase is already initialized and exported in this file
+  try {
+    // fetch original row to get email (and name)
+    const { data: found, error: fetchErr } = await supabase
+      .from("users")
+      .select("email, name, uniqueId")
+      .eq("uniqueId", uniqueId)
+      .limit(1)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error("markAllHuddyByUniqueId fetch error:", fetchErr);
+      return { success: false, reason: "db_error", error: fetchErr };
+    }
+    if (!found) return { success: false, reason: "not_found" };
+
+    const email = found.email;
+    const name = found.name ?? null;
+
+    // Get rows for email to determine if any entered
+    const { data: rowsForEmail, error: listErr } = await supabase
+      .from("users")
+      .select("id, uniqueId, isEntered, isHuddy")
+      .eq("email", email);
+
+    if (listErr) {
+      console.error("markAllHuddyByUniqueId list error:", listErr);
+      return { success: false, reason: "db_error", error: listErr };
+    }
+    if (!rowsForEmail || rowsForEmail.length === 0) {
+      return { success: false, reason: "not_found" };
+    }
+
+    // If none of the rows are entered, cannot claim
+    const anyEntered = rowsForEmail.some((r) => r.isEntered);
+    if (!anyEntered) {
+      return { success: false, reason: "not_entered", data: rowsForEmail };
+    }
+
+    // Bulk update only rows that are entered and not already huddy
+    const { data: updatedRows, error: updateErr } = await supabase
+      .from("users")
+      .update({ isHuddy: true })
+      .eq("email", email)
+      .eq("isEntered", true)
+      .neq("isHuddy", true)
+      .select("id, uniqueId, isEntered, isHuddy");
+
+    if (updateErr) {
+      console.error("markAllHuddyByUniqueId update error:", updateErr);
+      return { success: false, reason: "db_error", error: updateErr };
+    }
+
+    const updatedCount = Array.isArray(updatedRows)
+      ? updatedRows.length
+      : updatedRows
+      ? 1
+      : 0;
+
+    if (updatedCount === 0) {
+      // nothing updated — maybe already all huddy
+      return { success: false, reason: "already_taken", data: rowsForEmail };
+    }
+
+    return { success: true, email, name, updatedCount, updatedRows };
+  } catch (e) {
+    console.error("markAllHuddyByUniqueId exception:", e);
+    return { success: false, reason: "exception", error: e };
+  }
+};
 
 /**
- * Fetch users where isEntered = true
- * @param {number} page - 1-based page number
- * @param {number} limit - rows per page
- * @param {string} sortBy - column to sort by (e.g. "created_at" or "name")
- * @param {"asc"|"desc"} order - sort order
- * @returns {Promise<{success: boolean, data?: Array, count?: number, error?: any}>}
+ * ----------------------------
+ * Pagination fetchers
+ * - getEnteredUsers, getGiftUsers
+ * - return { success, data, count, error }
+ * ----------------------------
  */
-export const getEnteredUsers = async (page = 1, limit = 10, sortBy = "created_at", order = "desc") => {
+
+export const getEnteredUsers = async (
+  page = 1,
+  limit = 10,
+  sortBy = "created_at",
+  order = "desc"
+) => {
   try {
     const start = (page - 1) * limit;
     const end = start + limit - 1;
 
-    // select with exact count
     const { data, error, count } = await supabase
       .from("users")
-      .select("id, name, uniqueId, isEntered, isHuddy, created_at", { count: "exact" })
+      .select("id, name, uniqueId, email, isEntered, isHuddy, created_at", {
+        count: "exact",
+      })
       .eq("isEntered", true)
       .order(sortBy, { ascending: order === "asc" })
       .range(start, end);
@@ -215,18 +304,21 @@ export const getEnteredUsers = async (page = 1, limit = 10, sortBy = "created_at
   }
 };
 
-/**
- * Fetch users where isHuddy = true (Gift)
- * Same signature as getEnteredUsers
- */
-export const getGiftUsers = async (page = 1, limit = 10, sortBy = "created_at", order = "desc") => {
+export const getGiftUsers = async (
+  page = 1,
+  limit = 10,
+  sortBy = "created_at",
+  order = "desc"
+) => {
   try {
     const start = (page - 1) * limit;
     const end = start + limit - 1;
 
     const { data, error, count } = await supabase
       .from("users")
-      .select("id, name, uniqueId, isEntered, isHuddy, created_at", { count: "exact" })
+      .select("id, name, uniqueId, email, isEntered, isHuddy, created_at", {
+        count: "exact",
+      })
       .eq("isHuddy", true)
       .order(sortBy, { ascending: order === "asc" })
       .range(start, end);
